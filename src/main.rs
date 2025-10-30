@@ -4,6 +4,7 @@ use crate::error::PyeCliError;
 
 pub mod error;
 pub mod pye_api;
+pub mod utils;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about)]
@@ -39,12 +40,9 @@ async fn main() -> Result<(), PyeCliError> {
     let cli = Cli::parse();
     match cli.command {
         Commands::ValidatorLockupManager { args } => {
-            // TODO: Wait for next epoch
+            // TODO: Wait for next epoch (and for data to be populated)
             crate::pye_api::fetch_lockup_rewards(&args.api_url, &args.pye_api_key, args.epoch)
                 .await?;
-            // TODO: Determine amount of payments that need to be made for each validator
-            // TODO: Load in keypair
-            // TODO: Stack payment instructions and send transactions
         }
     }
 
