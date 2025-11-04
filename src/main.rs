@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use clap::{Parser, Subcommand};
 use solana_rpc_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::signature::read_keypair_file;
@@ -32,8 +34,6 @@ pub struct CommonHandlerArgs {
     pye_api_key: String,
     #[arg(long, env, default_value = "https://gwtgzlzfnztqhiulhgtm.supabase.co")]
     api_url: String,
-    #[arg(long, env)]
-    keypair_path: String,
 }
 
 #[derive(Subcommand, Debug)]
@@ -71,8 +71,9 @@ async fn main() -> Result<(), PyeCliError> {
                 current_epoch_info =
                     wait_for_next_epoch(&rpc_client, current_epoch_info.epoch, cycle_secs).await;
 
-                // TODO: Wait for epoch data to be populated
-                todo!("Wait for backend epoch data to be populated");
+                // We wait 12 hours before handling the epoch because it takes time for the Pye
+                // backend to obtain and aggregate the relevant epoch rewards data.
+                tokio::time::sleep(Duration::from_secs(43_200)).await;
 
                 crate::utils::handle_epoch(
                     &rpc_client,

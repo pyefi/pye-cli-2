@@ -1,3 +1,6 @@
+use std::time::Duration;
+
+use log::info;
 use reqwest::Client;
 use serde::Deserialize;
 use serde_with::{DisplayFromStr, serde_as};
@@ -53,4 +56,30 @@ pub async fn fetch_lockup_rewards(
     let res = serde_json::from_str(&body)?;
 
     Ok(res)
+}
+
+pub async fn fetch_lockup_rewards_with_retry(
+    url: &str,
+    api_key: &str,
+    epoch: u64,
+    max_attempts: u16,
+    wait_secs: u64,
+) -> Result<Vec<LockupRewards>, PyeCliError> {
+    let mut atempts: u16 = 0;
+    loop {
+        let res = fetch_lockup_rewards(url, api_key, epoch).await?;
+        if res.is_empty() {
+            atempts += 1;
+            if atempts >= max_attempts {
+                return Err(PyeCliError::FetchRewardsMaxAttempts);
+            }
+            info!(
+                "No LockupRewards found for Organization's validators. Attempt {}. Retrying...",
+                atempts
+            );
+            tokio::time::sleep(Duration::from_secs(wait_secs)).await;
+            continue;
+        }
+        return Ok(res);
+    }
 }

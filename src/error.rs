@@ -16,6 +16,8 @@ pub enum PyeCliError {
     DialoguerError(#[from] dialoguer::Error),
     #[error("AuthFailed: {0}")]
     AuthFailed(String),
+    #[error("Failed to fetch any rewards for your organization. Max attempts reached.")]
+    FetchRewardsMaxAttempts,
     #[error("ReadKeypairError: {0}")]
     ReadKeypairError(String),
 }

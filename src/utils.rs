@@ -23,7 +23,8 @@ pub async fn handle_epoch(
     confirm_prompt: bool,
 ) -> Result<(), PyeCliError> {
     let lockup_rewards =
-        crate::pye_api::fetch_lockup_rewards(&api_url, &pye_api_key, epoch).await?;
+        crate::pye_api::fetch_lockup_rewards_with_retry(&api_url, &pye_api_key, epoch, 24, 3_600)
+            .await?;
 
     let transfer_info_results = determine_transfer_amounts(lockup_rewards);
 
