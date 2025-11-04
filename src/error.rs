@@ -12,6 +12,10 @@ pub enum PyeCliError {
     TryFromIntError(#[from] TryFromIntError),
     #[error("SolanaClientError: {0}")]
     SolanaClientError(#[from] solana_rpc_client_api::client_error::Error),
+    #[error("DialoguerError: {0}")]
+    DialoguerError(#[from] dialoguer::Error),
     #[error("AuthFailed: {0}")]
     AuthFailed(String),
+    #[error("ReadKeypairError: {0}")]
+    ReadKeypairError(String),
 }

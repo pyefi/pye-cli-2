@@ -1,24 +1,61 @@
-use std::str::FromStr;
+use std::{str::FromStr, time::Duration};
 
+use dialoguer::Confirm;
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
 use solana_rpc_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{
+    epoch_info::EpochInfo,
     signature::{Keypair, Signature, Signer},
     transaction::Transaction,
 };
 use solana_system_interface::instruction;
+use tracing::{error, info};
 
 use crate::{error::PyeCliError, pye_api::LockupRewards};
 
+pub async fn handle_epoch(
+    rpc_client: &RpcClient,
+    api_url: &String,
+    pye_api_key: &String,
+    epoch: u64,
+    payer: &Keypair,
+    confirm_prompt: bool,
+) -> Result<(), PyeCliError> {
+    let lockup_rewards =
+        crate::pye_api::fetch_lockup_rewards(&api_url, &pye_api_key, epoch).await?;
 
-pub async fn handle_epoch(api_url: String, pye_api_key: String, epoch: u64, ) -> Result<(), PyeCliError> {
-  let lockup_rewards = crate::pye_api::fetch_lockup_rewards(&api_url, &pye_api_key, epoch).await?;
+    let transfer_info_results = determine_transfer_amounts(lockup_rewards);
 
-  let transfer_infos = determine_transfer_amounts(lockup_rewards);
-  Ok(())
+    let transfer_infos = filter_results(transfer_info_results);
+    info!("Transfer Infos: {:?}", transfer_infos);
+
+    let total_transfer_amount = transfer_infos
+        .iter()
+        .fold(0, |agg, transfer_info| agg + transfer_info.amount);
+
+    info!("Total SOL to be transfered: {}\n", total_transfer_amount);
+
+    if confirm_prompt {
+        let confirmed = Confirm::new()
+            .with_prompt(format!(
+                "Transfer {} lamports in excess rewards to all pye lockups?",
+                total_transfer_amount
+            ))
+            .interact()?;
+        if !confirmed {
+            return Ok(());
+        }
+    }
+
+    let transfer_instructions = generate_transfer_instructions(transfer_infos, &payer.pubkey());
+
+    make_transfers(rpc_client, transfer_instructions, payer).await?;
+
+    Ok(())
 }
 
+#[derive(Debug)]
 pub struct TransferInfo {
     pub to: Pubkey,
     pub amount: u64,
@@ -54,18 +91,11 @@ pub fn determine_transfer_amounts(
         .collect()
 }
 
-fn generate_transfer_instructions(
-    transfer_infos: Vec<Result<TransferInfo, PyeCliError>>,
-    from_pubkey: &Pubkey,
-) -> Vec<Instruction> {
+fn filter_results(transfer_infos: Vec<Result<TransferInfo, PyeCliError>>) -> Vec<TransferInfo> {
     transfer_infos
         .into_iter()
         .filter_map(|transfer_info| match transfer_info {
-            Ok(transfer_info) => Some(instruction::transfer(
-                from_pubkey,
-                &transfer_info.to,
-                transfer_info.amount,
-            )),
+            Ok(transfer_info) => Some(transfer_info),
             Err(error) => {
                 tracing::error!("Error generating transfer info {:?}", error);
                 None
@@ -74,10 +104,22 @@ fn generate_transfer_instructions(
         .collect()
 }
 
-pub async fn make_transfers(
+fn generate_transfer_instructions(
+    transfer_infos: Vec<TransferInfo>,
+    from_pubkey: &Pubkey,
+) -> Vec<Instruction> {
+    transfer_infos
+        .into_iter()
+        .map(|transfer_info| {
+            instruction::transfer(from_pubkey, &transfer_info.to, transfer_info.amount)
+        })
+        .collect()
+}
+
+async fn make_transfers(
     client: &RpcClient,
     instructions: Vec<Instruction>,
-    payer: Keypair,
+    payer: &Keypair,
 ) -> Result<Vec<Signature>, PyeCliError> {
     let mut signatures = vec![];
     let payer_pubkey = payer.pubkey();
@@ -90,4 +132,34 @@ pub async fn make_transfers(
         signatures.push(sig);
     }
     Ok(signatures)
+}
+
+pub async fn wait_for_next_epoch(
+    rpc_client: &RpcClient,
+    current_epoch: u64,
+    cycle_secs: u64,
+) -> EpochInfo {
+    loop {
+        tokio::time::sleep(Duration::from_secs(cycle_secs)).await;
+        info!(
+            "Checking for epoch boundary... current_epoch: {}",
+            current_epoch
+        );
+
+        let new_epoch_info = match rpc_client.get_epoch_info().await {
+            Ok(info) => info,
+            Err(e) => {
+                error!("Error getting epoch info: {:?}", e);
+                continue;
+            }
+        };
+
+        if new_epoch_info.epoch > current_epoch {
+            info!(
+                "New epoch detected: {} -> {}",
+                current_epoch, new_epoch_info.epoch
+            );
+            return new_epoch_info;
+        }
+    }
 }
