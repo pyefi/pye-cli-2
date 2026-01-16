@@ -18,9 +18,10 @@ solana-transaction-status-client-types= "2.2.7"
 serde = { version = "1.0", features = ["derive"] }
 serde_with = "3.15.1"
 serde_json = "1.0"
-tracing = "0.1.41"
-tokio = { version = "1", features = ["full"] }
 thiserror = "2.0.12"
+tokio = { version = "1", features = ["full"] }
+tracing = "0.1.43"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter", "json"] }
 regex = "1.11.1" 
 env_logger = "0.11"
 log = "0.4.27"

@@ -1,6 +1,8 @@
 use std::time::Duration;
 
 use clap::{Parser, Subcommand};
+use tracing::{Level, info};
+use tracing_subscriber::EnvFilter;
 use solana_rpc_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::signature::read_keypair_file;
 
@@ -57,7 +59,21 @@ enum Commands {
 
 #[tokio::main]
 async fn main() -> Result<(), PyeCliError> {
-    println!("Hello, world!");
+        let level = std::env::var("RUST_LOG").unwrap_or(Level::INFO.to_string());
+    tracing_subscriber::fmt()
+        .json()
+        .with_env_filter(EnvFilter::new(level))
+        // this needs to be set to remove duplicated information in the log.
+        .with_current_span(false)
+        // this needs to be set to false, otherwise ANSI color codes will
+        // show up in a confusing manner in CloudWatch logs.
+        .with_ansi(false)
+        // disabling time is handy because CloudWatch will add the ingestion time.
+        .without_time()
+        // remove the name of the function from every log entry
+        .with_target(false)
+        .init();
+    info!("Hello, world!");
     let cli = Cli::parse();
     match cli.command {
         Commands::ValidatorLockupManager { args, cycle_secs } => {
