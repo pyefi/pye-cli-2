@@ -1,10 +1,10 @@
-use std::time::Duration;
+use std::{collections::HashSet, time::Duration};
 
 use clap::{Parser, Subcommand};
-use tracing::{Level, info};
-use tracing_subscriber::EnvFilter;
 use solana_rpc_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::signature::read_keypair_file;
+use tracing::{Level, info};
+use tracing_subscriber::EnvFilter;
 
 use crate::{error::PyeCliError, utils::wait_for_next_epoch};
 
@@ -36,6 +36,9 @@ pub struct CommonHandlerArgs {
     pye_api_key: String,
     #[arg(long, env, default_value = "https://gwtgzlzfnztqhiulhgtm.supabase.co")]
     api_url: String,
+    /// List of Pye Lockup pubkeys that should continue receiving payments after maturity.
+    #[arg(long, env, value_delimiter = ',')]
+    allow_post_maturity: Vec<String>,
 }
 
 #[derive(Subcommand, Debug)]
@@ -59,7 +62,8 @@ enum Commands {
 
 #[tokio::main]
 async fn main() -> Result<(), PyeCliError> {
-        let level = std::env::var("RUST_LOG").unwrap_or(Level::INFO.to_string());
+    dotenvy::dotenv().ok();
+    let level = std::env::var("RUST_LOG").unwrap_or(Level::INFO.to_string());
     tracing_subscriber::fmt()
         .json()
         .with_env_filter(EnvFilter::new(level))
@@ -82,6 +86,8 @@ async fn main() -> Result<(), PyeCliError> {
 
             let rpc_client = RpcClient::new(args.rpc_url.clone());
             let mut current_epoch_info = rpc_client.get_epoch_info().await?;
+            let allow_post_maturity: HashSet<String> =
+                args.allow_post_maturity.into_iter().map(|x| x).collect();
             loop {
                 // Wait for next epoch
                 current_epoch_info =
@@ -97,6 +103,7 @@ async fn main() -> Result<(), PyeCliError> {
                     &args.pye_api_key,
                     current_epoch_info.epoch,
                     &payer,
+                    &allow_post_maturity,
                     false,
                 )
                 .await?;
@@ -108,12 +115,15 @@ async fn main() -> Result<(), PyeCliError> {
 
             let rpc_client = RpcClient::new(args.rpc_url);
 
+            let allow_post_maturity: HashSet<String> =
+                args.allow_post_maturity.into_iter().map(|x| x).collect();
             crate::utils::handle_epoch(
                 &rpc_client,
                 &args.api_url,
                 &args.pye_api_key,
                 epoch,
                 &payer,
+                &allow_post_maturity,
                 true,
             )
             .await?;

@@ -20,4 +20,6 @@ pub enum PyeCliError {
     FetchRewardsMaxAttempts,
     #[error("ReadKeypairError: {0}")]
     ReadKeypairError(String),
+    #[error("PyeApiError: Status Code {0} Message: {1}")]
+    PyeApiError(u16, String),
 }

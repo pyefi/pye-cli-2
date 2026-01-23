@@ -1,4 +1,4 @@
-use std::{str::FromStr, time::Duration};
+use std::{collections::HashSet, str::FromStr, time::Duration};
 
 use dialoguer::Confirm;
 use solana_instruction::Instruction;
@@ -20,11 +20,26 @@ pub async fn handle_epoch(
     pye_api_key: &String,
     epoch: u64,
     payer: &Keypair,
+    allow_post_maturity: &HashSet<String>,
     confirm_prompt: bool,
 ) -> Result<(), PyeCliError> {
+    // Try every 30min for 24 hours
     let lockup_rewards =
-        crate::pye_api::fetch_lockup_rewards_with_retry(&api_url, &pye_api_key, epoch, 24, 3_600)
+        crate::pye_api::fetch_lockup_rewards_with_retry(&api_url, &pye_api_key, epoch, 48, 1_800)
             .await?;
+
+    // Filter out any that have matured unless the Lockup pubkey is in _allow_post_maturity_
+    let now = chrono::Utc::now().timestamp();
+    let lockup_rewards = lockup_rewards
+        .into_iter()
+        .filter(|lockup_rewards| {
+            let has_not_matured =
+                !lockup_rewards.maturity_handled && now <= (lockup_rewards.maturity_ts + 86_400);
+            let supported_after_maturity =
+                allow_post_maturity.contains(&lockup_rewards.lockup_pubkey);
+            has_not_matured || supported_after_maturity
+        })
+        .collect();
 
     let transfer_info_results = determine_transfer_amounts(lockup_rewards);
 

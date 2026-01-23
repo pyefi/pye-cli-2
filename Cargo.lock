@@ -372,8 +372,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "145052bdd345b87320e369255277e3fb5152762ad123a901ef5c262dd38fe8d2"
 dependencies = [
  "iana-time-zone",
+ "js-sys",
  "num-traits",
  "serde",
+ "wasm-bindgen",
  "windows-link 0.2.1",
 ]
 
@@ -694,6 +696,12 @@ dependencies = [
  "quote",
  "syn",
 ]
+
+[[package]]
+name = "dotenvy"
+version = "0.15.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1aaf95b3e5c8f23aa320147307562d361db0ae0d51242340f558153b4eb2439b"
 
 [[package]]
 name = "dyn-clone"
@@ -1941,12 +1949,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "pye-cli-2"
-version = "0.1.0"
+name = "pye-cli"
+version = "2.0.0"
 dependencies = [
  "borsh",
+ "chrono",
  "clap",
  "dialoguer",
+ "dotenvy",
  "env_logger",
  "log",
  "regex",
