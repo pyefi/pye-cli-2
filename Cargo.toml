@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 borsh = "1.3"
+chrono = "0.4.42"
 clap = { version = "4", features = ["derive", "env"] }
 dialoguer = "0.11"
 dotenvy = "0.15.7"

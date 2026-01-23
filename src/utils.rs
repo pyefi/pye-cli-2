@@ -29,12 +29,15 @@ pub async fn handle_epoch(
             .await?;
 
     // Filter out any that have matured unless the Lockup pubkey is in _allow_post_maturity_
+    let now = chrono::Utc::now().timestamp();
     let lockup_rewards = lockup_rewards
         .into_iter()
         .filter(|lockup_rewards| {
-            !lockup_rewards.maturity_handled
-                || lockup_rewards.maturity_handled
-                    && allow_post_maturity.contains(&lockup_rewards.lockup_pubkey)
+            let has_not_matured =
+                !lockup_rewards.maturity_handled && now <= (lockup_rewards.maturity_ts + 86_400);
+            let supported_after_maturity =
+                allow_post_maturity.contains(&lockup_rewards.lockup_pubkey);
+            has_not_matured || supported_after_maturity
         })
         .collect();
 
