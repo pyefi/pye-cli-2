@@ -1949,8 +1949,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "pye-cli-2"
-version = "0.1.0"
+name = "pye-cli"
+version = "2.0.0"
 dependencies = [
  "borsh",
  "chrono",
