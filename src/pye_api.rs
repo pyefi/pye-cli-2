@@ -34,6 +34,7 @@ pub struct LockupRewards {
     pub mev_tips_bps: u16,
     pub block_rewards_bps: u16,
     pub issuer: String,
+    pub maturity_handled: bool,
 }
 
 pub async fn fetch_lockup_rewards(
