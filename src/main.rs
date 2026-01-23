@@ -62,6 +62,7 @@ enum Commands {
 
 #[tokio::main]
 async fn main() -> Result<(), PyeCliError> {
+    dotenvy::dotenv().ok();
     let level = std::env::var("RUST_LOG").unwrap_or(Level::INFO.to_string());
     tracing_subscriber::fmt()
         .json()

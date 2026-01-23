@@ -8,7 +8,7 @@ use serde_with::{DisplayFromStr, serde_as};
 use crate::error::PyeCliError;
 
 #[serde_as]
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct LockupRewards {
     pub validator_vote_account: String,
     pub lockup_pubkey: String,
@@ -53,10 +53,15 @@ pub async fn fetch_lockup_rewards(
         .header("Content-Type", "application/json")
         .send()
         .await?;
+    let status = res.status().as_u16();
     let body = res.text().await?;
-    let res = serde_json::from_str(&body)?;
+    if status >= 300 {
+        Err(PyeCliError::PyeApiError(status, body))
+    } else {
+        let res = serde_json::from_str(&body)?;
 
-    Ok(res)
+        Ok(res)
+    }
 }
 
 pub async fn fetch_lockup_rewards_with_retry(
