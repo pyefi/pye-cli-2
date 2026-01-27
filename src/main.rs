@@ -97,7 +97,7 @@ async fn main() -> Result<(), PyeCliError> {
                 // backend to obtain and aggregate the relevant epoch rewards data.
                 tokio::time::sleep(Duration::from_secs(43_200)).await;
 
-                crate::utils::handle_epoch(
+                let handle_epoch_res = crate::utils::handle_epoch(
                     &rpc_client,
                     &args.api_url,
                     &args.pye_api_key,
@@ -106,7 +106,15 @@ async fn main() -> Result<(), PyeCliError> {
                     &allow_post_maturity,
                     false,
                 )
-                .await?;
+                .await;
+                match handle_epoch_res {
+                    Ok(_) => {},
+                    Err(err) => {
+                        tracing::error!("{}", err.to_string());
+                        // We don't panic here, this way it can try again next epoch without 
+                        // requiring re-deployment or re-initialization.
+                    },
+                }
             }
         }
         Commands::HandleEpoch { args, epoch } => {
