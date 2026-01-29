@@ -145,6 +145,7 @@ async fn make_transfers(
             Transaction::new_signed_with_payer(&batch, Some(&payer_pubkey), &[&payer], blockhash);
 
         let sig = client.send_and_confirm_transaction(&tx).await?;
+        info!("TX confirmed: {}", sig);
         signatures.push(sig);
     }
     Ok(signatures)
