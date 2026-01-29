@@ -97,11 +97,13 @@ async fn main() -> Result<(), PyeCliError> {
                 // backend to obtain and aggregate the relevant epoch rewards data.
                 tokio::time::sleep(Duration::from_secs(43_200)).await;
 
+                let target_epoch = current_epoch_info.epoch - 1;
+
                 let handle_epoch_res = crate::utils::handle_epoch(
                     &rpc_client,
                     &args.api_url,
                     &args.pye_api_key,
-                    current_epoch_info.epoch,
+                    target_epoch,
                     &payer,
                     &allow_post_maturity,
                     false,
