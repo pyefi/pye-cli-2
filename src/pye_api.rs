@@ -1,54 +1,39 @@
-use std::time::Duration;
-
 use log::info;
 use reqwest::Client;
 use serde::Deserialize;
+use serde_json;
 use serde_with::{DisplayFromStr, serde_as};
 
 use crate::error::PyeCliError;
 
 #[serde_as]
 #[derive(Debug, Deserialize)]
-pub struct LockupRewards {
-    pub validator_vote_account: String,
-    pub lockup_pubkey: String,
+pub struct BondPaymentsV2 {
+    pub id: String,
+    pub bond_pubkey: String,
+    #[serde_as(as = "DisplayFromStr")]
+    pub amount: u64,
+    pub fee_payer: Option<String>,
+    pub is_jito_claim: bool,
     #[serde_as(as = "DisplayFromStr")]
     pub epoch: u64,
+    pub finalized: bool,
+    pub signature: Option<String>,
+    pub finalization_attempts: u16,
     #[serde_as(as = "DisplayFromStr")]
-    pub base_inflation_rewards: u64,
-    #[serde_as(as = "DisplayFromStr")]
-    pub expected_inflation_rewards: u64,
-    #[serde_as(as = "DisplayFromStr")]
-    pub base_mev_rewards: u64,
-    #[serde_as(as = "DisplayFromStr")]
-    pub expected_mev_rewards: u64,
-    #[serde_as(as = "DisplayFromStr")]
-    pub base_block_rewards: u64,
-    #[serde_as(as = "DisplayFromStr")]
-    pub expected_block_rewards: u64,
-    #[serde_as(as = "DisplayFromStr")]
-    pub maturity_ts: i64,
-    pub stake_account: String,
-    pub transient_stake_account: String,
-    pub inflation_bps: u16,
-    pub mev_tips_bps: u16,
-    pub block_rewards_bps: u16,
-    pub issuer: String,
-    pub maturity_handled: bool,
+    pub expected_amount: u64,
+    pub organization_id: u64,
+    pub validator_vote_account: String,
 }
 
-pub async fn fetch_lockup_rewards(
+pub async fn fetch_bond_payments_v2(
     url: &str,
     api_key: &str,
-    epoch: u64,
-) -> Result<Vec<LockupRewards>, PyeCliError> {
+) -> Result<Vec<BondPaymentsV2>, PyeCliError> {
     let client = Client::new();
 
     let res = client
-        .get(format!(
-            "{}/functions/v1/lockup_rewards?epoch={}",
-            url, epoch
-        ))
+        .get(format!("{}/functions/v1/bond_payments_v2", url))
         .header("x-api-key", api_key)
         .header("Content-Type", "application/json")
         .send()
@@ -64,28 +49,40 @@ pub async fn fetch_lockup_rewards(
     }
 }
 
-pub async fn fetch_lockup_rewards_with_retry(
+pub async fn update_bond_payments_signatures(
     url: &str,
     api_key: &str,
-    epoch: u64,
-    max_attempts: u16,
-    wait_secs: u64,
-) -> Result<Vec<LockupRewards>, PyeCliError> {
-    let mut atempts: u16 = 0;
-    loop {
-        let res = fetch_lockup_rewards(url, api_key, epoch).await?;
-        if res.is_empty() {
-            atempts += 1;
-            if atempts >= max_attempts {
-                return Err(PyeCliError::FetchRewardsMaxAttempts);
-            }
-            info!(
-                "No LockupRewards found for Organization's validators. Attempt {}. Retrying...",
-                atempts
-            );
-            tokio::time::sleep(Duration::from_secs(wait_secs)).await;
-            continue;
-        }
-        return Ok(res);
+    payment_ids: &[String],
+    signature: &str,
+) -> Result<(), PyeCliError> {
+    let client = Client::new();
+
+    let payload = serde_json::json!({
+        "payment_ids": payment_ids,
+        "signature": signature
+    });
+
+    let res = client
+        .post(format!(
+            "{}/functions/v1/update_bond_payment_signatures",
+            url
+        ))
+        .header("x-api-key", api_key)
+        .header("Content-Type", "application/json")
+        .json(&payload)
+        .send()
+        .await?;
+
+    let status = res.status().as_u16();
+    let body = res.text().await?;
+
+    if status >= 300 {
+        Err(PyeCliError::PyeApiError(status, body))
+    } else {
+        info!(
+            "Successfully updated signatures for {} payments",
+            payment_ids.len()
+        );
+        Ok(())
     }
 }
