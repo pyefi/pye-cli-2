@@ -36,28 +36,6 @@ pub struct CommonHandlerArgs {
     pye_api_key: String,
     #[arg(long, env, default_value = "https://gwtgzlzfnztqhiulhgtm.supabase.co")]
     api_url: String,
-    /// List of Pye Lockup pubkeys that should continue receiving payments after maturity.
-    #[arg(long, env, value_delimiter = ',')]
-    allow_post_maturity: Vec<String>,
-}
-
-#[derive(Debug, Parser)]
-pub struct CommonHandlerArgsV2 {
-    /// RPC Endpoint
-    #[arg(
-        short,
-        long,
-        env,
-        default_value = "https://api.mainnet-beta.solana.com"
-    )]
-    rpc_url: String,
-    /// Path to payer keypair
-    #[arg(short, long, env)]
-    payer: String,
-    #[arg(long, env)]
-    pye_api_key: String,
-    #[arg(long, env, default_value = "https://gwtgzlzfnztqhiulhgtm.supabase.co")]
-    api_url: String,
 }
 
 #[derive(Subcommand, Debug)]
@@ -65,7 +43,7 @@ enum Commands {
     /// Will run the excess rewards stuff for all pye_accounts owned by a validator
     ValidatorLockupManager {
         #[command(flatten)]
-        args: CommonHandlerArgsV2,
+        args: CommonHandlerArgs,
         /// The wait time (in secs) between epoch change checks
         #[arg(long, env, default_value = "60")]
         cycle_secs: u64,
