@@ -24,6 +24,7 @@ pub async fn handle_payments_to_be_sent(
     payer: &Keypair,
 ) -> Result<(), PyeCliError> {
     let payments = crate::pye_api::fetch_bond_payments_v2(&api_url, &pye_api_key).await?;
+    info!("handle_payments_to_be_sent: Payments: {:?}", payments.len());
 
     // step 1: create instructions
     let mut transfer_instructions_with_payment_ids = vec![];
