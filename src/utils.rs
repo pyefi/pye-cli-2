@@ -36,7 +36,6 @@ pub async fn handle_payments_to_be_sent(
     let mut transfer_instructions_with_payment_ids = vec![];
 
     for payment in payments {
-        // @todo check what if amount is null?
         let payment_amount = payment.expected_amount - payment.amount;
 
         if payment_amount <= 0 {
