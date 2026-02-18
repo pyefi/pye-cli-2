@@ -1,6 +1,6 @@
-# pye-cli-2 Commands
+# pye-cli Commands
 
-A Solana-based CLI for managing validator lockup rewards distribution.
+A Solana-based CLI for managing bond payment distributions through the Pye backend.
 
 ## Global Options
 
@@ -11,60 +11,85 @@ All commands accept these options:
 | `-r, --rpc-url` | `RPC_URL` | `https://api.mainnet-beta.solana.com` | Solana RPC endpoint |
 | `-p, --payer` | `PAYER` | Required | Path to payer keypair file |
 | `--pye-api-key` | `PYE_API_KEY` | Required | Pye API authentication key |
-| `--api-url` | `API_URL` | `https://gwtgzlzfnztqhiulhgtm.supabase.co` | Pye backend API URL |
+| `--api-url` | `API_URL` | `https://ABCDEFG.supabase.co` | Pye backend API URL |
 
 ## Commands
 
 ### `validator-lockup-manager`
 
-Continuously monitors and distributes excess rewards for all pye lockup accounts owned by a validator. Runs as a daemon that waits for epoch changes.
+Continuously monitors and processes bond payments. Runs as a daemon that polls the Pye backend for pending payments.
 
 ```bash
-pye-cli-2 validator-lockup-manager [OPTIONS]
+pye-cli validator-lockup-manager [OPTIONS]
 ```
 
 **Options:**
 
 | Option | Env Var | Default | Description |
 |--------|---------|---------|-------------|
-| `--cycle-secs` | `CYCLE_SECS` | `60` | Seconds between epoch change checks |
+| `--cycle-secs` | `CYCLE_SECS` | `60` | Seconds between payment check cycles |
 
 **Behavior:**
-1. Waits for the next epoch to begin
-2. Waits 12 hours for Pye backend to aggregate rewards data
-3. Fetches lockup rewards from Pye API
-4. Calculates and transfers excess rewards automatically (no confirmation prompt)
 
----
+1. **Fetch Pending Payments**: Queries the Pye backend API for `bond_payments_v2` records that need to be processed
+2. **Create Transfer Instructions**: For each payment, creates a SOL transfer instruction from the payer to the bond account
+3. **Batch Transactions**: Groups transfers into batches of 50 instructions per transaction
+4. **Pre-register Signatures**: Before sending each transaction, calls the backend API with:
+   - Transaction signature
+   - Array of `payment_infos` containing:
+     - `payment_id`: The database ID of the payment
+     - `instruction_index`: The position of this payment's instruction in the transaction (0-based)
+5. **Submit Transactions**: Sends the signed transaction to the Solana network
+6. **Continuous Loop**: Waits `cycle_secs` seconds and repeats
 
-### `handle-epoch`
+**Payment Calculation:**
 
-Manually processes rewards for a specific epoch. Useful for one-time execution or testing.
-
-```bash
-pye-cli-2 handle-epoch --epoch <EPOCH> [OPTIONS]
-```
-
-**Options:**
-
-| Option | Env Var | Default | Description |
-|--------|---------|---------|-------------|
-| `--epoch` | `EPOCH` | Required | The epoch number to process |
-
-**Behavior:**
-1. Fetches lockup rewards from Pye API (retries up to 24 times with 1-hour intervals)
-2. Calculates excess rewards (expected - base) for inflation, MEV, and block rewards
-3. Prompts for user confirmation before transferring
-4. Batches transfers (50 per transaction) and submits to the blockchain
-
-## Reward Calculation
-
-Excess rewards are calculated as:
+For each payment, the transfer amount is calculated as:
 
 ```
-transfer_amount = (expected_inflation - base_inflation)
-                + (expected_mev - base_mev)
-                + (expected_block - base_block)
+transfer_amount = expected_amount - amount
 ```
 
-If the sum is negative, no transfer occurs.
+If `transfer_amount <= 0`, the payment is skipped.
+
+**Important Notes:**
+
+- The CLI automatically transfers funds without user confirmation
+- Transaction instruction order is critical - the `instruction_index` must match the actual position in the transaction
+- The backend uses the signature and instruction indices to track and verify payments on-chain
+- Failed transactions will be retried in subsequent cycles
+
+## API Integration
+
+The CLI interacts with two Pye backend endpoints:
+
+### `GET /functions/v1/bond_payments_v2`
+
+Fetches pending payments to process.
+
+**Response:** Array of `BondPaymentsV2` objects containing:
+- `id`: Payment ID
+- `bond_pubkey`: Destination bond account
+- `amount`: Base amount already paid
+- `expected_amount`: Total amount that should be paid
+- `epoch`: The epoch this payment is for
+- Other metadata fields
+
+### `POST /functions/v1/update_bond_payment_signatures`
+
+Updates payment records with transaction details.
+
+**Request Body:**
+```json
+{
+  "signature": "transaction_signature_string",
+  "payment_infos": [
+    {
+      "payment_id": "uuid",
+      "instruction_index": 0
+    }
+  ]
+}
+```
+
+**Response:** Confirmation of updated records

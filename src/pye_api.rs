@@ -1,3 +1,4 @@
+use crate::utils::PaymentInfo;
 use log::info;
 use reqwest::Client;
 use serde::Deserialize;
@@ -52,13 +53,13 @@ pub async fn fetch_bond_payments_v2(
 pub async fn update_bond_payments_signatures(
     url: &str,
     api_key: &str,
-    payment_ids: &[String],
+    payment_infos: &[PaymentInfo],
     signature: &str,
 ) -> Result<(), PyeCliError> {
     let client = Client::new();
 
     let payload = serde_json::json!({
-        "payment_ids": payment_ids,
+        "payment_infos": payment_infos,
         "signature": signature
     });
 
@@ -81,7 +82,7 @@ pub async fn update_bond_payments_signatures(
     } else {
         info!(
             "Successfully updated signatures for {} payments",
-            payment_ids.len()
+            payment_infos.len()
         );
         Ok(())
     }

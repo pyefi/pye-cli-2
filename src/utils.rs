@@ -17,6 +17,12 @@ struct TransferInstuctionWithPaymentId {
     pub payment_id: String,
 }
 
+#[derive(serde::Serialize)]
+pub struct PaymentInfo {
+    pub payment_id: String,
+    pub instruction_index: u64,
+}
+
 pub async fn handle_payments_to_be_sent(
     rpc_client: &RpcClient,
     api_url: &String,
@@ -52,6 +58,8 @@ pub async fn handle_payments_to_be_sent(
     // step 2: make transfers
     let payer_pubkey = payer.pubkey();
     for batch in transfer_instructions_with_payment_ids.chunks(50) {
+        // WARNING: in the below transaction, instruction order matters.
+        // please check the readme for more details.
         let instructions: Vec<_> = batch.iter().map(|x| x.instruction.clone()).collect();
         let blockhash = rpc_client.get_latest_blockhash().await?;
         let tx = Transaction::new_signed_with_payer(
@@ -67,11 +75,19 @@ pub async fn handle_payments_to_be_sent(
         // Collect payment IDs for this batch
         let payment_ids: Vec<String> = batch.iter().map(|x| x.payment_id.clone()).collect();
 
+        let mut payment_infos: Vec<PaymentInfo> = Vec::new();
+        for (i, payment_id) in payment_ids.iter().enumerate() {
+            payment_infos.push(PaymentInfo {
+                payment_id: payment_id.clone(),
+                instruction_index: i as u64,
+            });
+        }
+
         // Save the signature in the backend DB along with the payment ids
         crate::pye_api::update_bond_payments_signatures(
             api_url,
             pye_api_key,
-            &payment_ids,
+            &payment_infos,
             &signature.to_string(),
         )
         .await?;
