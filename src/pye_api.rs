@@ -15,7 +15,9 @@ pub struct BondPaymentsV2 {
     #[serde_as(as = "DisplayFromStr")]
     pub amount: u64,
     pub fee_payer: Option<String>,
-    pub is_jito_claim: bool,
+    /// Can be null in DB (BOOLEAN DEFAULT FALSE without NOT NULL)
+    #[serde(default)]
+    pub is_jito_claim: Option<bool>,
     #[serde_as(as = "DisplayFromStr")]
     pub epoch: u64,
     pub finalized: bool,
