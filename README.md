@@ -43,12 +43,7 @@ pye-cli validator-lockup-manager \
 Continuously polls the Pye backend for pending bond payments and processes them automatically.
 
 **How it works:**
-1. Fetches pending payments from the backend (`GET /functions/v1/bond_payments_v2`)
-2. Creates transfer instructions for each payment
-3. Batches up to 50 transfers per transaction
-4. Pre-registers each transaction signature with payment IDs and instruction indices
-5. Submits the transaction to Solana
-6. Waits for the next cycle and repeats
+See [CLI_COMMANDS.md](./CLI_COMMANDS.md) for detailed documentation of the process.
 
 ### Example with Custom Cycle
 

@@ -40,6 +40,7 @@ pye-cli validator-lockup-manager [OPTIONS]
      - `payment_id`: The database ID of the payment
      - `instruction_index`: The position of this payment's instruction in the transaction (0-based)
 5. **Submit Transactions**: Sends the signed transaction to the Solana network
+6. **Backend checking tx**: The backend will attempt to confirm the transaction every minute for 15 minutes. If the TX is still not confirmed, then the payment will be re-tried.
 6. **Continuous Loop**: Waits `cycle_secs` seconds and repeats
 
 **Payment Calculation:**
