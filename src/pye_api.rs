@@ -33,7 +33,10 @@ pub async fn fetch_bond_payments_v2(
     url: &str,
     api_key: &str,
 ) -> Result<Vec<BondPaymentsV2>, PyeCliError> {
-    let client = Client::new();
+    let client = Client::builder()
+        .connect_timeout(std::time::Duration::from_secs(10))
+        .timeout(std::time::Duration::from_secs(30))
+        .build()?;
 
     let res = client
         .get(format!("{}/functions/v1/bond_payments_v2", url))
@@ -58,7 +61,10 @@ pub async fn update_bond_payments_signatures(
     payment_infos: &[PaymentInfo],
     signature: &str,
 ) -> Result<(), PyeCliError> {
-    let client = Client::new();
+    let client = Client::builder()
+        .connect_timeout(std::time::Duration::from_secs(10))
+        .timeout(std::time::Duration::from_secs(30))
+        .build()?;
 
     let payload = serde_json::json!({
         "payment_infos": payment_infos,
