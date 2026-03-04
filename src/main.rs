@@ -67,7 +67,7 @@ async fn main() -> Result<(), PyeCliError> {
         // remove the name of the function from every log entry
         .with_target(false)
         .init();
-    info!("Hello, world!");
+
     let cli = Cli::parse();
     match cli.command {
         Commands::ValidatorLockupManager { args, cycle_secs } => {
