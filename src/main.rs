@@ -34,7 +34,7 @@ pub struct CommonHandlerArgs {
     payer: String,
     #[arg(long, env)]
     pye_api_key: String,
-    #[arg(long, env, default_value = "https://gwtgzlzfnztqhiulhgtm.supabase.co")]
+    #[arg(long, env, default_value = "https://tfrickmnrfyjkvjhmuik.supabase.co")]
     api_url: String,
 }
 
