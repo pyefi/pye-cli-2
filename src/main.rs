@@ -3,7 +3,7 @@ use std::time::Duration;
 use clap::{Parser, Subcommand};
 use solana_rpc_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::signature::read_keypair_file;
-use tracing::{Level, info};
+use tracing::Level;
 use tracing_subscriber::EnvFilter;
 
 use crate::error::PyeCliError;
@@ -97,6 +97,4 @@ async fn main() -> Result<(), PyeCliError> {
             }
         }
     }
-
-    Ok(())
 }
