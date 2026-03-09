@@ -3,6 +3,7 @@ use std::time::Duration;
 use clap::{Parser, Subcommand};
 use solana_rpc_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::signature::read_keypair_file;
+use solana_sdk::signer::Signer;
 use tracing::Level;
 use tracing_subscriber::EnvFilter;
 
@@ -11,6 +12,13 @@ use crate::error::PyeCliError;
 pub mod error;
 pub mod pye_api;
 pub mod utils;
+
+/// CLI version sent in heartbeat telemetry.
+/// Use Semantic Versioning (SemVer): MAJOR.MINOR.PATCH
+/// - MAJOR: breaking changes / incompatible API
+/// - MINOR: new features, backward compatible
+/// - PATCH: bug fixes only, backward compatible
+const CLI_HEARTBEAT_VERSION: &str = "2.0.0";
 
 #[derive(Parser, Debug)]
 #[command(author, version, about)]
@@ -36,6 +44,9 @@ pub struct CommonHandlerArgs {
     pye_api_key: String,
     #[arg(long, env, default_value = "https://tfrickmnrfyjkvjhmuik.supabase.co")]
     api_url: String,
+    /// Email address for low balance alerts (optional; if set, alerts are sent when balance is below threshold)
+    #[arg(long, env)]
+    cli_alert_email: Option<String>,
 }
 
 #[derive(Subcommand, Debug)]
@@ -45,7 +56,7 @@ enum Commands {
         #[command(flatten)]
         args: CommonHandlerArgs,
         /// The wait time (in secs) between epoch change checks
-        #[arg(long, env, default_value = "60")]
+        #[arg(long, env, default_value = "300")]
         cycle_secs: u64,
     },
 }
@@ -77,6 +88,81 @@ async fn main() -> Result<(), PyeCliError> {
             let rpc_client = RpcClient::new(args.rpc_url.clone());
 
             loop {
+                // CLI heartbeat: fetch alert info, maybe send low-balance alert, then report telemetry
+                let balance_lamports = rpc_client.get_balance(&payer.pubkey()).await.unwrap_or(0);
+
+                let current_epoch = rpc_client
+                    .get_epoch_info()
+                    .await
+                    .ok()
+                    .map(|info| info.epoch);
+
+                let alert_info =
+                    crate::pye_api::get_cli_alert_info(&args.api_url, &args.pye_api_key).await;
+
+                let (_should_alert, alert_sent_for_epoch) = match (current_epoch, alert_info) {
+                    (Some(epoch), Ok(info)) => {
+                        let avg_str = info.avg_expected_amount_last_3_epochs.trim();
+                        // API returns decimal string (e.g. "197164398.00000000"); u64 parse fails on the dot, so take integer part
+                        let avg_lamports: u64 = avg_str
+                            .split('.')
+                            .next()
+                            .unwrap_or(avg_str)
+                            .parse()
+                            .unwrap_or(0);
+                        let threshold = avg_lamports.saturating_mul(3);
+                        let below_threshold = balance_lamports < threshold;
+                        let already_alerted = info
+                            .cli_low_balance_alert_last_epoch
+                            .map(|last| epoch <= last)
+                            .unwrap_or(false);
+                        let should = below_threshold && !already_alerted && avg_lamports > 0;
+
+                        let sent_alert = if should {
+                            args.cli_alert_email
+                                .as_ref()
+                                .map(|e| !e.trim().is_empty())
+                                .unwrap_or(false)
+                                && {
+                                    if let Err(e) = crate::pye_api::send_cli_low_balance_alert(
+                                        &args.api_url,
+                                        &args.pye_api_key,
+                                        args.cli_alert_email.as_deref().unwrap_or(""),
+                                        epoch,
+                                        balance_lamports,
+                                    )
+                                    .await
+                                    {
+                                        tracing::warn!(
+                                            "Failed to send low balance alert email: {}",
+                                            e
+                                        );
+                                        false
+                                    } else {
+                                        true
+                                    }
+                                }
+                        } else {
+                            false
+                        };
+                        (should, if sent_alert { Some(epoch) } else { None })
+                    }
+                    _ => (false, None),
+                };
+
+                if let Err(e) = crate::pye_api::report_cli_heartbeat(
+                    &args.api_url,
+                    &args.pye_api_key,
+                    &payer.pubkey().to_string(),
+                    balance_lamports,
+                    CLI_HEARTBEAT_VERSION,
+                    alert_sent_for_epoch,
+                )
+                .await
+                {
+                    tracing::warn!("CLI heartbeat failed: {}", e);
+                }
+
                 let handle_payments_res = crate::utils::handle_payments_to_be_sent(
                     &rpc_client,
                     &args.api_url,
