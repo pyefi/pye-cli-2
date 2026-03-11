@@ -18,7 +18,7 @@ pub mod utils;
 /// - MAJOR: breaking changes / incompatible API
 /// - MINOR: new features, backward compatible
 /// - PATCH: bug fixes only, backward compatible
-const CLI_HEARTBEAT_VERSION: &str = "2.0.0";
+const CLI_HEARTBEAT_VERSION: &str = "2.0.1";
 
 #[derive(Parser, Debug)]
 #[command(author, version, about)]
@@ -88,14 +88,34 @@ async fn main() -> Result<(), PyeCliError> {
             let rpc_client = RpcClient::new(args.rpc_url.clone());
 
             loop {
+                // 1. Process payments first so that when we check balance (and maybe alert), the amount reflects post-payout state
+                let handle_payments_res = crate::utils::handle_payments_to_be_sent(
+                    &rpc_client,
+                    &args.api_url,
+                    &args.pye_api_key,
+                    &payer,
+                )
+                .await;
+                match handle_payments_res {
+                    Ok(_) => {}
+                    Err(err) => {
+                        tracing::error!("{}", err.to_string());
+                        // We don't panic here, this way it can try again without
+                        // requiring re-deployment or re-initialization.
+                    }
+                }
+
+                // 2. Check balance and maybe send low-balance alert (only past half-epoch, when payouts are done)
                 // CLI heartbeat: fetch alert info, maybe send low-balance alert, then report telemetry
                 let balance_lamports = rpc_client.get_balance(&payer.pubkey()).await.unwrap_or(0);
 
-                let current_epoch = rpc_client
-                    .get_epoch_info()
-                    .await
-                    .ok()
-                    .map(|info| info.epoch);
+                let epoch_info = rpc_client.get_epoch_info().await.ok();
+                let current_epoch = epoch_info.as_ref().map(|info| info.epoch);
+                // Only consider sending low-balance alert past half-epoch, when payouts have almost certainly been processed
+                let past_half_epoch = epoch_info
+                    .as_ref()
+                    .map(|info| info.slot_index * 2 >= info.slots_in_epoch)
+                    .unwrap_or(false);
 
                 let alert_info =
                     crate::pye_api::get_cli_alert_info(&args.api_url, &args.pye_api_key).await;
@@ -116,7 +136,10 @@ async fn main() -> Result<(), PyeCliError> {
                             .cli_low_balance_alert_last_epoch
                             .map(|last| epoch <= last)
                             .unwrap_or(false);
-                        let should = below_threshold && !already_alerted && avg_lamports > 0;
+                        let should = below_threshold
+                            && !already_alerted
+                            && avg_lamports > 0
+                            && past_half_epoch;
 
                         let sent_alert = if should {
                             args.cli_alert_email
@@ -161,22 +184,6 @@ async fn main() -> Result<(), PyeCliError> {
                 .await
                 {
                     tracing::warn!("CLI heartbeat failed: {}", e);
-                }
-
-                let handle_payments_res = crate::utils::handle_payments_to_be_sent(
-                    &rpc_client,
-                    &args.api_url,
-                    &args.pye_api_key,
-                    &payer,
-                )
-                .await;
-                match handle_payments_res {
-                    Ok(_) => {}
-                    Err(err) => {
-                        tracing::error!("{}", err.to_string());
-                        // We don't panic here, this way it can try again without
-                        // requiring re-deployment or re-initialization.
-                    }
                 }
 
                 tokio::time::sleep(Duration::from_secs(cycle_secs)).await;
