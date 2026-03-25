@@ -23,11 +23,7 @@ Continuously monitors and processes bond payments. Runs as a daemon that polls t
 pye-cli validator-lockup-manager [OPTIONS]
 ```
 
-**Options:**
-
-| Option | Env Var | Default | Description |
-|--------|---------|---------|-------------|
-| `--cycle-secs` | `CYCLE_SECS` | `60` | Seconds between payment check cycles |
+**Cycle interval:** The daemon waits **5 minutes** between iterations. This is hardcoded in the binary (not configurable via CLI or environment).
 
 **Behavior:**
 
@@ -41,7 +37,7 @@ pye-cli validator-lockup-manager [OPTIONS]
      - `instruction_index`: The position of this payment's instruction in the transaction (0-based)
 5. **Submit Transactions**: Sends the signed transaction to the Solana network
 6. **Backend checking tx**: The backend will attempt to confirm the transaction every minute for 15 minutes. If the TX is still not confirmed, then the payment will be re-tried.
-6. **Continuous Loop**: Waits `cycle_secs` seconds and repeats
+7. **Continuous Loop**: Waits 5 minutes and repeats
 
 **Payment Calculation:**
 

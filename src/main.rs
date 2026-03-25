@@ -18,7 +18,7 @@ pub mod utils;
 /// - MAJOR: breaking changes / incompatible API
 /// - MINOR: new features, backward compatible
 /// - PATCH: bug fixes only, backward compatible
-const CLI_HEARTBEAT_VERSION: &str = "2.0.1";
+const CLI_HEARTBEAT_VERSION: &str = "2.0.2";
 
 #[derive(Parser, Debug)]
 #[command(author, version, about)]
@@ -55,9 +55,6 @@ enum Commands {
     ValidatorLockupManager {
         #[command(flatten)]
         args: CommonHandlerArgs,
-        /// The wait time (in secs) between epoch change checks
-        #[arg(long, env, default_value = "300")]
-        cycle_secs: u64,
     },
 }
 
@@ -81,7 +78,7 @@ async fn main() -> Result<(), PyeCliError> {
 
     let cli = Cli::parse();
     match cli.command {
-        Commands::ValidatorLockupManager { args, cycle_secs } => {
+        Commands::ValidatorLockupManager { args } => {
             let payer = read_keypair_file(&args.payer)
                 .map_err(|err| PyeCliError::ReadKeypairError(err.to_string()))?;
 
@@ -186,7 +183,7 @@ async fn main() -> Result<(), PyeCliError> {
                     tracing::warn!("CLI heartbeat failed: {}", e);
                 }
 
-                tokio::time::sleep(Duration::from_secs(cycle_secs)).await;
+                tokio::time::sleep(Duration::from_secs(5 * 60)).await;
             }
         }
     }

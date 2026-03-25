@@ -26,7 +26,6 @@ PYE_API_KEY=your-api-key
 # Optional
 RPC_URL=https://api.mainnet-beta.solana.com
 API_URL=https://ABCDEFG.supabase.co
-CYCLE_SECS=60
 RUST_LOG=info
 ```
 
@@ -40,21 +39,10 @@ pye-cli validator-lockup-manager \
   --pye-api-key your-api-key
 ```
 
-Continuously polls the Pye backend for pending bond payments and processes them automatically.
+Continuously polls the Pye backend for pending bond payments and processes them automatically. The wait between cycles is fixed at **5 minutes** (configured in code, not via flags or env).
 
 **How it works:**
 See [CLI_COMMANDS.md](./CLI_COMMANDS.md) for detailed documentation of the process.
-
-### Example with Custom Cycle
-
-```bash
-pye-cli validator-lockup-manager \
-  --payer /path/to/keypair.json \
-  --pye-api-key your-api-key \
-  --cycle-secs 120
-```
-
-Checks for new payments every 2 minutes instead of the default 60 seconds.
 
 ## Payment Processing
 
