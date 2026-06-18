@@ -36,11 +36,11 @@ pub async fn handle_payments_to_be_sent(
     let mut transfer_instructions_with_payment_ids = vec![];
 
     for payment in payments {
-        let payment_amount = payment.expected_amount - payment.amount;
-
-        if payment_amount <= 0 {
+        if payment.expected_amount <= payment.amount {
             continue;
         }
+
+        let payment_amount = payment.expected_amount - payment.amount;
 
         let transfer_instruction = instruction::transfer(
             &payer.pubkey(),
